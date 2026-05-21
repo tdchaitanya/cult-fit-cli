@@ -1,0 +1,30 @@
+{
+  "name": "cult-fit-cli",
+  "version": "1.0.0",
+  "description": "CLI to browse, book, and manage Cult.fit fitness classes",
+  "main": "cult.js",
+  "bin": {
+    "cult": "./cult.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cult.fit",
+    "fitness",
+    "cli",
+    "booking"
+  ],
+  "author": "tdchaitanya",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tdchaitanya/cult-fit-cli"
+  },
+  "homepage": "https://github.com/tdchaitanya/cult-fit-cli#readme",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "commander": "^14.0.3",
+    "dotenv": "^16.5.0"
+  }
+}
