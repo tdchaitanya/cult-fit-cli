@@ -158,7 +158,7 @@ const program = new Command();
 
 program
     .name('cult')
-    .description('Cult.fit class browser & booking CLI')
+    .description('Unofficial Cult.fit CLI — browse, book, and manage fitness classes')
     .version('1.0.0');
 
 program

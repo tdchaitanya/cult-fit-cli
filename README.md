@@ -1,6 +1,6 @@
 # cult-fit-cli
 
-A CLI for browsing, booking, and managing Cult.fit fitness classes via the mobile app's API.
+An **unofficial** CLI for browsing, booking, and managing Cult.fit fitness classes via the mobile app's API.
 
 > **Disclaimer:** This project uses Cult.fit's private mobile API without official authorisation. It likely violates Cult.fit's Terms of Use — specifically Section 6.2 (prohibition on automated access) and Section 6.5(18) (prohibition on reverse engineering). Using it may result in account suspension under Section 12.2. This is a personal project shared for educational purposes. **Use at your own risk.**
 
@@ -44,7 +44,7 @@ cult setup
 ```
 
 `setup` does everything in one go:
-1. **Detects your location** via IP geolocation and asks you to confirm (or enter coordinates manually if wrong)
+1. **Detects your location** via IP geolocation (no permission needed — uses your public IP) and asks you to confirm (or enter coordinates manually if wrong)
 2. **Authenticates your device** via phone + OTP and writes your `AT` token to `.env`
 
 No Charles Proxy, no manual coordinate lookup needed.
