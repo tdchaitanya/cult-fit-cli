@@ -41,8 +41,9 @@ const headers = {
 
 const BOOKING_BODY = { productType: 'FITNESS', operatingSystemVersion: '26.3.1' };
 
-if (!process.env.LAT || !process.env.LON) {
-    console.error('Error: LAT and LON must be set in .env — copy .env.sample and fill in your coordinates');
+// setup prompts for location interactively, so allow it through without LAT/LON
+if (process.argv[2] !== 'setup' && (!process.env.LAT || !process.env.LON)) {
+    console.error('Error: LAT and LON not set — run: cult setup');
     process.exit(1);
 }
 
@@ -263,6 +264,57 @@ program
     });
 
 program
+    .command('autobook')
+    .description('Find and book the next available slot matching center + time')
+    .requiredOption('-c, --center <id>', 'Center ID to book at', parseInt)
+    .requiredOption('-t, --time <HH:MM:SS>', 'Target start time (24h with seconds, e.g. 07:00:00)')
+    .option('-n, --dry-run', 'Print what would be booked without actually booking')
+    .action(async (opts) => {
+        try {
+            const dateMap = await fetchListing();
+            const dates = Object.keys(dateMap).sort();
+            if (dates.length === 0) throw new Error('No dates in listing response');
+
+            const lastDate = dates[dates.length - 1];
+            const lastDay = dateMap[lastDate];
+            console.log(`Last available date: ${lastDate}`);
+
+            const slot = lastDay.classByTimeList?.find(t => t.id === opts.time);
+            if (!slot) throw new Error(`No ${opts.time} slot on ${lastDate}. Available: ${lastDay.classByTimeList?.map(t => t.id).join(', ')}`);
+
+            const centerEntry = slot.centerWiseClasses?.find(c => c.centerId === opts.center);
+            if (!centerEntry) {
+                const ids = slot.centerWiseClasses?.map(c => c.centerId).join(', ');
+                throw new Error(`Center ${opts.center} not in ${opts.time} slot on ${lastDate}. Available center IDs: ${ids}`);
+            }
+
+            const cls = centerEntry.classes?.[0];
+            if (!cls) throw new Error('No class found in center entry');
+
+            console.log(`Target: ${lastDate} ${opts.time} — class ${cls.id} (${cls.state}${cls.state === 'WAITLIST_AVAILABLE' ? `, ${cls.waitlistInfo?.waitlistedUserCount} ahead` : ''})`);
+
+            if (opts.dryRun) { console.log('Dry run — skipping booking'); return; }
+
+            try {
+                const res = await axios.post(`${BASE_URL}/api/cult/class/${cls.id}/book`, BOOKING_BODY, { headers });
+                console.log('Booked:', extractConfirmation(res.data));
+            } catch (bookErr) {
+                const isFull = bookErr.response?.status === 409 ||
+                    JSON.stringify(bookErr.response?.data ?? '').toLowerCase().includes('full');
+                if (isFull) {
+                    console.log('Class full — joining waitlist…');
+                    const res = await axios.post(`${BASE_URL}/api/cult/class/${cls.id}/waitlist`, BOOKING_BODY, { headers });
+                    console.log('Waitlisted:', extractConfirmation(res.data));
+                } else {
+                    throw bookErr;
+                }
+            }
+        } catch (err) {
+            die(err);
+        }
+    });
+
+program
     .command('cancel <bookingNumber>')
     .description('Cancel a booking by booking number (shown in brackets when you book)')
     .action(async (bookingNumber) => {
@@ -297,6 +349,59 @@ program
             die(err);
         }
     });
+
+async function promptLocation() {
+    const readline = require('readline');
+    const fs = require('fs');
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q) => new Promise(resolve => rl.question(q, resolve));
+
+    let lat, lon;
+
+    try {
+        process.stdout.write('Detecting your location… ');
+        const res = await axios.get('http://ip-api.com/json', { timeout: 5000 });
+        if (res.data?.status === 'success') {
+            lat = String(res.data.lat);
+            lon = String(res.data.lon);
+            const place = [res.data.city, res.data.regionName].filter(Boolean).join(', ');
+            console.log(`detected ${place} (${lat}, ${lon})`);
+            const answer = await ask('Use this location? [Y/n]: ');
+            if (answer.trim().toLowerCase() === 'n') { lat = null; lon = null; }
+        } else {
+            console.log('could not detect');
+        }
+    } catch {
+        console.log('could not detect');
+    }
+
+    if (!lat || !lon) {
+        console.log("Find your coordinates at https://maps.google.com (right-click → \"What's here?\")");
+        lat = (await ask('Latitude: ')).trim();
+        lon = (await ask('Longitude: ')).trim();
+    }
+
+    rl.close();
+
+    const envPath = `${__dirname}/.env`;
+    let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    const setEnv = (content, key, value) =>
+        content.includes(`${key}=`)
+            ? content.replace(new RegExp(`^${key}=.*`, 'm'), `${key}=${value}`)
+            : content.trimEnd() + `\n${key}=${value}`;
+    envContent = setEnv(envContent, 'LAT', lat);
+    envContent = setEnv(envContent, 'LON', lon);
+    fs.writeFileSync(envPath, envContent.trimStart());
+
+    // update in-memory state for this session
+    process.env.LAT = lat;
+    process.env.LON = lon;
+    headers.lat = lat;
+    headers.lon = lon;
+
+    console.log(`✓ Location saved (${lat}, ${lon})\n`);
+}
 
 async function runAuthFlow(deviceInfo) {
     const readline = require('readline');
@@ -374,10 +479,11 @@ async function runAuthFlow(deviceInfo) {
 
 program
     .command('setup')
-    .description('First-time setup: get your AT token via phone + OTP (no Charles Proxy needed)')
+    .description('First-time setup: detect location, then authenticate via phone + OTP')
     .action(async () => {
         const { encryptedDeviceId: _omit, ...coldDeviceInfo } = DEVICE_INFO;
         try {
+            if (!process.env.LAT || !process.env.LON) await promptLocation();
             await runAuthFlow(coldDeviceInfo);
             console.log('\nSetup complete. Try: cult classes');
         } catch (err) { die(err); }

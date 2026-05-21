@@ -40,15 +40,20 @@ After cloning, replace `cult` with `node cult.js` in all commands below.
 ## Setup
 
 ```bash
-cp .env.sample .env   # fill in LAT/LON before running
 cult setup
 ```
 
-Edit `.env` and set `LAT`/`LON` to coordinates near your gym before running `setup`. Everything else (`AT`, `DEVICE_ID`, `ENCRYPTED_DEVICE_ID`) is written automatically by `setup`.
+`setup` does everything in one go:
+1. **Detects your location** via IP geolocation and asks you to confirm (or enter coordinates manually if wrong)
+2. **Authenticates your device** via phone + OTP and writes your `AT` token to `.env`
 
-`setup` authenticates your device, sends an OTP to your phone, and writes your `AT` token to `.env` automatically. No Charles Proxy needed.
+No Charles Proxy, no manual coordinate lookup needed.
 
 ```
+Detecting your location… detected Bengaluru, Karnataka (12.9634, 77.5855)
+Use this location? [Y/n]:
+✓ Location saved (12.9634, 77.5855)
+
 Authenticating device… done
 Phone number (10 digits, no country code): <your-phone-number>
 Sending OTP… done
@@ -59,6 +64,8 @@ Verifying… done
 
 Setup complete. Try: cult classes
 ```
+
+If location detection fails or you want a different location, you can always edit `LAT`/`LON` in `.env` directly, then run `cult centers` to find the center IDs near you.
 
 ---
 
@@ -120,6 +127,17 @@ cult bookings
 cult info 7883216
 ```
 
+### `autobook` — find and book the next available slot
+
+Useful for cron jobs or manual one-shot booking — finds the furthest-out date, locates your center+time slot, and books it (falls back to waitlist if full).
+
+```bash
+cult autobook --center 3 --time 07:00:00            # book for real
+cult autobook --center 3 --time 07:00:00 --dry-run  # preview only
+```
+
+Run `cult centers` to find your center ID.
+
 ### `setup` — first-time token setup
 
 Run once after installing (see [Setup](#setup) above).
@@ -145,14 +163,14 @@ Same 3-step flow as `setup` — sends an OTP to your phone, exchanges it for a f
 
 ## Scheduling (optional)
 
-Cult.fit opens booking 4 days in advance. If you want to autobook a recurring slot automatically, you can set up a system cron job. For example, to book a 7am class at center 3 every night at 10:30pm:
+Cult.fit opens booking 4 days in advance. Use `autobook` with any system scheduler to book a recurring slot automatically. For example, to book a 7am class at center 3 every night at 10:30pm IST:
 
 ```bash
 # Run `crontab -e` and add:
-30 22 * * 0,1,4,5  cd /path/to/cult-fit-cli && cult book $(cult classes --center 3 --time 07:00 --available --no-names | awk 'NR==3{print $NF}')
+30 22 * * 0,1,4,5  cd /path/to/cult-fit-cli && cult autobook --center 3 --time 07:00:00
 ```
 
-Or use any task scheduler you prefer — the CLI is just a Node.js process you can invoke however you like.
+The days `0,1,4,5` (Sun/Mon/Thu/Fri) book 4 days ahead for Mon/Tue/Fri/Sat. Adjust to match your workout days. Run `cult centers` to find your center ID.
 
 ---
 
