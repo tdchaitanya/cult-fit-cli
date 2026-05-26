@@ -1,6 +1,6 @@
 {
   "name": "cult-fit-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Unofficial CLI to browse, book, and manage Cult.fit fitness classes",
   "main": "cult.js",
   "bin": {
