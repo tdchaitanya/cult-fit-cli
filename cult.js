@@ -41,8 +41,10 @@ const headers = {
 
 const BOOKING_BODY = { productType: 'FITNESS', operatingSystemVersion: '26.3.1' };
 
-// setup prompts for location interactively, so allow it through without LAT/LON
-if (process.argv[2] !== 'setup' && (!process.env.LAT || !process.env.LON)) {
+// setup prompts for location; help/version flags need no env either
+const needsEnv = !['setup', '--help', '-h', '--version', '-V'].includes(process.argv[2])
+    && !process.argv.includes('--help') && !process.argv.includes('-h');
+if (needsEnv && (!process.env.LAT || !process.env.LON)) {
     console.error('Error: LAT and LON not set — run: cult setup');
     process.exit(1);
 }
